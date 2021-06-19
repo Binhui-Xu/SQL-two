@@ -33,28 +33,22 @@
 SELECT COUNT(ProductID) as NumOfProducts FROM Production.Product
 --2
 SELECT COUNT(ProductID) as ProdinSub
-from Production.Product p INNER JOIN Production.ProductSubcategory s
-on p.ProductSubcategoryID=s.ProductSubcategoryID
+from Production.Product
+where ProductSubcategoryID is not NULL
  --3
- SELECT COUNT(p.ProductID) as countedProducts,p.ProductSubcategoryID
- FROM Production.ProductSubcategory s INNER JOIN Production.Product p
-on p.ProductSubcategoryID=s.ProductSubcategoryID
+SELECT COUNT(p.ProductID) as countedProducts,p.ProductSubcategoryID
+FROM  Production.Product p
+where p.ProductSubcategoryID is not NULL
 GROUP BY p.ProductSubcategoryID
 --4
 SELECT COUNT(productID) as result
-from Production.Product p left JOIN Production.ProductSubcategory s
-on p.ProductSubcategoryID=s.ProductSubcategoryID
-WHERE s.ProductSubcategoryID is NULL
-
-SELECT COUNT(productID) as result
-from Production.Product 
-WHERE ProductSubcategoryID is NULL
+from Production.Product p
+WHERE p.ProductSubcategoryID is NULL
 --5
 SELECT SUM(Quantity) as sum
-from Production.ProductInventory 
+from Production.ProductInventory
+GROUP BY ProductID 
 --6
-SELECT * FROM Production.ProductInventory
-
 SELECT ProductID,SUM(Quantity) as TheSum
 FROM Production.ProductInventory
 WHERE LocationID=40 
@@ -72,50 +66,49 @@ from Production.ProductInventory
 WHERE LocationID=10
 GROUP BY ProductID
 --9
-SELECT AVG(Quantity) as TheAvg,Shelf
+SELECT ProductID,AVG(Quantity) as TheAvg,Shelf
 FROM Production.ProductInventory
-GROUP BY Shelf
+GROUP BY ProductID,Shelf
 --10
-SELECT AVG(Quantity) as TheAvg,Shelf
+SELECT ProductID,AVG(Quantity) as TheAvg,Shelf
 FROM Production.ProductInventory
-WHERE Shelf != 'N/A'
-GROUP BY Shelf
+WHERE Shelf <> 'N/A'
+GROUP BY ProductID,Shelf
 --11
-SELECT * FROM Production.Product
-
-SELECT Color, Class, COUNT(ProductID) as TheCount, AVG(ListPrice) as AvgPrice
+SELECT Color, Class, COUNT(*) as TheCount, AVG(ListPrice) as AvgPrice
 FROM Production.Product
 WHERE Color IS NOT NULL and Class IS NOT NULL
 GROUP BY Color, Class
 --12
-SELECT c.Name,s.Name
-FROM Person.CountryRegion c INNER JOIN Person.StateProvince s
+SELECT c.Name as Country,s.Name as Province
+FROM Person.CountryRegion c FULL JOIN Person.StateProvince s
 ON c.CountryRegionCode=s.CountryRegionCode
 --13
-SELECT c.Name,s.Name
-FROM Person.CountryRegion c INNER JOIN Person.StateProvince s
+SELECT c.Name as Country,s.Name as Province
+FROM Person.CountryRegion c FULL JOIN Person.StateProvince s
 ON c.CountryRegionCode=s.CountryRegionCode
-WHERE c.Name ='Germany' OR c.Name='Canada'
+WHERE c.Name NOT IN('Germany','Canada')
 --14(Northwind)
-SELECT distinct p.ProductName
-from dbo.Orders o INNER JOIN(select orderID,ProductID from dbo.[Order Details]) od
+SELECT distinct p.*
+from dbo.Orders o Full JOIN(select orderID,ProductID from dbo.[Order Details]) od
 ON o.OrderID=od.OrderID
-INNER JOIN dbo.Products p
+left JOIN dbo.Products p
 on od.ProductID=p.ProductID
-WHERE DATEDIFF(YYYY,CURRENT_TIMESTAMP,o.OrderDate) <25 
+WHERE DATEDIFF(YYYY,o.OrderDate,CURRENT_TIMESTAMP) <25 
 --15
-SELECT top 5 o.shipPostalCode,sum(od.Quantity) as count
-FROM dbo.Orders o FULL JOIN dbo.[Order Details] od
+SELECT top 5 o.ShipPostalCode,SUM(Quantity) as count
+from dbo.Orders o FULL join dbo.[Order Details] od
 ON o.OrderID=od.OrderID
 WHERE o.ShipPostalCode IS NOT NULL
 GROUP BY o.ShipPostalCode
 ORDER BY count DESC
 --16
-SELECT top 5 o.shipPostalCode,sum(od.Quantity) as count
+SELECT top 5 o.shipPostalCode, SUM(Quantity) as COUNT
 FROM dbo.Orders o FULL JOIN dbo.[Order Details] od
-ON o.OrderID=od.OrderID
-WHERE o.ShipPostalCode IS NOT NULL AND DATEDIFF(YYYY,CURRENT_TIMESTAMP,o.OrderDate)<21
-GROUP BY o.ShipPostalCode
+on o.OrderID=od.OrderID
+where o.ShipPostalCode is not null and 
+    DATEDIFF(year,GETDATE(),o.OrderDate)<21
+GROUP by o.ShipPostalCode
 ORDER BY count DESC
 --17
 SELECT city, COUNT(CustomerID) as numOfCustomers
@@ -127,30 +120,35 @@ FROM dbo.Customers
 GROUP BY City
 HAVING COUNT(CustomerID)>10
 --19
-SELECT c.ContactName,o.OrderDate
+SELECT distinct c.ContactName,o.OrderDate
 FROM dbo.Orders o inner join dbo.Customers c
 ON o.CustomerID=c.CustomerID
 WHERE o.OrderDate>'1998-01-01'
 --20
-SELECT top 1 c.ContactName,OrderDate
-FROM dbo.Orders o inner join dbo.Customers c
-ON o.CustomerID=c.CustomerID
-ORDER BY o.OrderDate DESC
+SELECT c.ContactName
+FROM dbo.Orders o inner join Customers c
+on o.CustomerID=c.CustomerID
+where o.OrderDate IN(
+select top 1 OrderDate
+from Orders
+WHERE OrderDate is not null
+GROUP BY orderDate
+order by OrderDate desc)
 --21
-SELECT COUNT(ProductID) as count,c.ContactName
-FROM dbo.Orders o INNER JOIN dbo.Customers c
+SELECT Sum(Quantity) as count,c.ContactName
+FROM dbo.Orders o RIGHT JOIN dbo.Customers c
 ON o.CustomerID=c.CustomerID
 INNER JOIN dbo.[Order Details] od
 ON o.OrderID=od.OrderID
 GROUP BY c.ContactName
 --22
-SELECT COUNT(ProductID) as count,c.ContactName
-FROM dbo.Orders o INNER JOIN dbo.Customers c
+SELECT Sum(Quantity) as count,c.ContactName
+FROM dbo.Orders o RIGHT JOIN dbo.Customers c
 ON o.CustomerID=c.CustomerID
 INNER JOIN dbo.[Order Details] od
 ON o.OrderID=od.OrderID
 GROUP BY c.ContactName
-HAVING COUNT(ProductID)>100
+HAVING Sum(Quantity)>100
 --23
 SELECT si.CompanyName,su.CompanyName
 FROM dbo.Shippers si cross JOIN dbo.Suppliers su
@@ -164,6 +162,7 @@ ORDER BY o.OrderDate
 SELECT e1.LastName+' '+e1.FirstName as Employee1,e2.LastName+' '+e2.FirstName as Employee2, e1.Title
 FROM dbo.Employees e1 INNER JOIN dbo.Employees e2
 ON e1.Title=e2.Title
+WHERE e1.FirstName <> e2.FirstName or e1.LastName <> e2.LastName
 --26
 SELECT e.FirstName+' '+LastName as Manager
 FROM dbo.Employees e INNER JOIN
